@@ -55,6 +55,11 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .tab.on{color:var(--fg);border-color:var(--gold)}
 .tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .note{font-size:12px;color:var(--muted)}
+.themes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.th{font:inherit;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:#10131b;color:var(--fg);cursor:pointer}
+.th.on{border-color:var(--gold)}
+.th i{width:26px;height:26px;border-radius:50%;flex:none;border:2px solid}
+.th:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -105,19 +110,19 @@ input[type=range]{width:100%;accent-color:var(--gold)}
   </div>
 
   <div class="card">
+    <div>
+      <label>イメージカラー（文字の色も切り替わります）</label>
+      <div class="themes" id="themes"></div>
+    </div>
     <div class="file">
-      <label for="bg">背景画像（そのイベントの告知画像など）</label>
-      <input id="bg" type="file" accept="image/*">
+      <label for="bgS" id="lblS">ストーリー用の背景画像（9:16）</label>
+      <input id="bgS" type="file" accept="image/*">
     </div>
-    <div>
-      <label for="blur">ぼかし（強いほど元の文字が読めなくなります）</label>
-      <input id="blur" type="range" min="0" max="100" value="70">
+    <div class="file">
+      <label for="bgX" id="lblX">X用の背景画像（4:5）。未選択ならストーリー用の中央を切り出します</label>
+      <input id="bgX" type="file" accept="image/*">
     </div>
-    <div>
-      <label for="dark">暗さ</label>
-      <input id="dark" type="range" min="0" max="85" value="50">
-    </div>
-    <div class="note">背景は1枚で、ストーリー用にもX用にも中央を切り出して使います。一度選べば端末に記憶されます。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
+    <div class="note">背景画像は色ごとに1組ずつ、端末に記憶されます。画像がない色は、単色の背景で表示します。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
   </div>
 
   <div class="btns">
@@ -137,28 +142,42 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 (function(){
   var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
   var $=function(id){return document.getElementById(id)};
-  var mode='s', count=3, bgImg=null, ypos={s:960,x:675}, DEF={s:960,x:675};
+  var mode='s', count=3, theme='teal', bg={s:null,x:null}, ypos={s:960,x:675}, DEF={s:960,x:675};
   var RANGE={s:[400,1500],x:[300,1050]}, H={s:1920,x:1350};
   var FONT='"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif';
-  var GOLD='#d9bd82', IVORY='#f3ecdc';
-  var FIELDS=['name','start','regend','entry','addonFee','blur','dark'];
+  var THEMES=[
+    {id:'teal',name:'深緑ティール',acc:'#d9bd82',ivory:'#f3ecdc',base:'#1f4a4c',edge:'#153538'},
+    {id:'wine',name:'ワイン',acc:'#e3bea0',ivory:'#f6ece2',base:'#4a1f2a',edge:'#341319'},
+    {id:'navy',name:'ネイビー',acc:'#c6d4e8',ivory:'#f2f0ea',base:'#1c2a44',edge:'#121b2e'},
+    {id:'bronze',name:'墨ブロンズ',acc:'#e0a45e',ivory:'#f4ede1',base:'#2a2622',edge:'#1b1815'}
+  ];
+  var GOLD, IVORY, TH=THEMES[0];
+  function acca(a){ var n=parseInt(TH.acc.slice(1),16); return 'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+  function applyTheme(id){
+    TH=THEMES[0]; THEMES.forEach(function(t){ if(t.id===id) TH=t; });
+    theme=TH.id; GOLD=TH.acc; IVORY=TH.ivory;
+    bg={s:null,x:null};
+    ['s','x'].forEach(function(m){ try{ var u=localStorage.getItem('tj_bg_'+theme+'_'+m); if(u){ var im=new Image(); im.onload=function(){ bg[m]=im; draw(); }; im.src=u; } }catch(e){} });
+    var box=$('themes'); if(box){ Array.prototype.forEach.call(box.children,function(b){ b.classList.toggle('on',b.getAttribute('data-id')===theme); }); }
+  }
+  var FIELDS=['name','start','regend','entry','addonFee'];
 
   try{
     var st=JSON.parse(localStorage.getItem('tj_state')||'{}');
     FIELDS.forEach(function(k){ if(st[k]!==undefined) $(k).value=st[k]; });
     if(st.addon) $('addon').checked=true;
     if(typeof st.count==='number') count=st.count;
+    if(st.theme) theme=st.theme;
     if(typeof st.ys==='number') ypos.s=st.ys;
     if(typeof st.yx==='number') ypos.x=st.yx;
   }catch(e){}
   function clampY(){ ['s','x'].forEach(function(m){ var v=ypos[m]; if(isNaN(v)) v=DEF[m]; ypos[m]=Math.min(RANGE[m][1],Math.max(RANGE[m][0],v)); }); }
   clampY();
-  try{ var d=localStorage.getItem('tj_bg'); if(d){ var im0=new Image(); im0.onload=function(){bgImg=im0;draw();}; im0.src=d; } }catch(e){}
 
   function setMsg(s){ $('msg').textContent=s; }
   function persist(){
     try{
-      var o={addon:$('addon').checked,count:count,ys:ypos.s,yx:ypos.x};
+      var o={theme:theme,addon:$('addon').checked,count:count,ys:ypos.s,yx:ypos.x};
       FIELDS.forEach(function(k){ o[k]=$(k).value; });
       localStorage.setItem('tj_state',JSON.stringify(o));
     }catch(e){}
@@ -184,45 +203,19 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     ]).catch(function(){});
   }
 
-  /* ---- 背景: 縮小→段階的に拡大でぼかす（iPhoneのcanvasはfilter非対応のため） ---- */
-  var blurCache={key:'',canvas:null};
-  function coverCanvas(im,w,h){
-    var c=document.createElement('canvas'); c.width=w; c.height=h;
-    var r=Math.max(w/im.width,h/im.height), iw=im.width*r, ih=im.height*r;
-    c.getContext('2d').drawImage(im,(w-iw)/2,(h-ih)/2,iw,ih);
-    return c;
+  /* ---- 背景 ---- */
+  function cover(c,im,h,dy){
+    var r=Math.max(1080/im.width,h/im.height), w=im.width*r, hh=im.height*r;
+    c.drawImage(im,(1080-w)/2,(h-hh)/2+(dy||0),w,hh);
   }
-  function blurred(m,amount){
-    var h=H[m], key=m+'|'+amount+'|'+(bgImg?bgImg.src.length+'|'+bgImg.width:0);
-    if(blurCache.key===key) return blurCache.canvas;
-    var base=coverCanvas(bgImg,1080,h);
-    if(amount>0){
-      var k=1+amount*0.6;                       // 縮小率(最大 約61分の1)
-      var w=Math.max(4,Math.round(1080/k)), hh=Math.max(4,Math.round(h/k));
-      var cur=document.createElement('canvas'); cur.width=w; cur.height=hh;
-      var cx=cur.getContext('2d'); cx.imageSmoothingQuality='high'; cx.drawImage(base,0,0,w,hh);
-      while(cur.width<1080){
-        var nw=Math.min(1080,cur.width*2), nh=Math.round(nw*h/1080);
-        var n=document.createElement('canvas'); n.width=nw; n.height=nh;
-        var nx=n.getContext('2d'); nx.imageSmoothingEnabled=true; nx.imageSmoothingQuality='high';
-        nx.drawImage(cur,0,0,nw,nh); cur=n;
-      }
-      base=cur;
-    }
-    blurCache={key:key,canvas:base};
-    return base;
-  }
-
   function drawBase(c,m){
     var h=H[m];
-    if(bgImg){
-      c.drawImage(blurred(m,+$('blur').value),0,0,1080,h);
-      c.fillStyle='rgba(0,0,0,'+(+$('dark').value/100)+')'; c.fillRect(0,0,1080,h);
-    }else{
-      var g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'#1a1d2b'); g.addColorStop(1,'#10121a');
+    if(bg[m]){ cover(c,bg[m],h,0); }
+    else if(m==='x'&&bg.s){ c.save(); c.translate(0,-285); cover(c,bg.s,1920,0); c.restore(); }
+    else{
+      var g=c.createRadialGradient(540,h*0.5,60,540,h*0.5,Math.max(h,1080)*0.75);
+      g.addColorStop(0,TH.base); g.addColorStop(1,TH.edge);
       c.fillStyle=g; c.fillRect(0,0,1080,h);
-      c.fillStyle='#8e93a6'; c.font='500 40px '+FONT; c.textAlign='center'; c.textBaseline='alphabetic';
-      c.fillText('背景画像を選んでください',540,h*0.12);
     }
   }
 
@@ -265,18 +258,18 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     var total=250+R.length*RH+60+(count>0?300:190);
     var top=ypos[m]-total/2;
     spaced(c,"Today's TOURNAMENT",top+20,50,GOLD,10);
-    c.fillStyle='rgba(217,189,130,.55)'; c.fillRect(440,top+54,200,2);
+    c.fillStyle=acca(.55); c.fillRect(440,top+54,200,2);
     var name=($('name').value||'').trim()||'TOURNAMENT';
     var fs=fitName(c,name,900);
     center(c,name,top+60+fs*0.95+30,fs,900,IVORY);
     var y0=top+250;
-    c.fillStyle='rgba(217,189,130,.45)'; c.fillRect(120,y0-20,840,2);
+    c.fillStyle=acca(.45); c.fillRect(120,y0-20,840,2);
     for(var i=0;i<R.length;i++){
       var by=y0+i*RH+RH*0.68;
       c.font='700 40px "Cinzel",serif'; c.fillStyle=GOLD; c.textAlign='left'; c.textBaseline='alphabetic';
       shadow(c,true); c.fillText(R[i][0].split('').join(' '),130,by-6);
       c.font='900 76px '+FONT; c.fillStyle=IVORY; c.textAlign='right'; c.fillText(R[i][1],950,by); shadow(c,false);
-      c.fillStyle='rgba(217,189,130,.45)'; c.fillRect(120,y0+(i+1)*RH-20,840,2);
+      c.fillStyle=acca(.45); c.fillRect(120,y0+(i+1)*RH-20,840,2);
     }
     var cy=y0+R.length*RH+40;
     if(count>0){
@@ -379,22 +372,32 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     try{ navigator.clipboard.writeText(t).then(done,fail); }catch(e){ fail(); }
   };
 
-  $('bg').addEventListener('change',function(ev){
-    var f=ev.target.files&&ev.target.files[0]; if(!f) return;
-    var fr=new FileReader();
-    fr.onload=function(){
-      var im=new Image();
-      im.onload=function(){
-        var c=document.createElement('canvas'); var r=Math.min(1,1080/im.width);
-        c.width=Math.round(im.width*r); c.height=Math.round(im.height*r);
-        c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-        try{ localStorage.setItem('tj_bg',c.toDataURL('image/jpeg',0.9)); }catch(e){}
-        bgImg=im; draw(); setMsg('背景画像を設定しました。');
+  function bindBg(id,m){
+    $(id).addEventListener('change',function(ev){
+      var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+      var fr=new FileReader();
+      fr.onload=function(){
+        var im=new Image();
+        im.onload=function(){
+          var c=document.createElement('canvas'); var r=Math.min(1,1080/im.width);
+          c.width=Math.round(im.width*r); c.height=Math.round(im.height*r);
+          c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+          try{ localStorage.setItem('tj_bg_'+theme+'_'+m,c.toDataURL('image/jpeg',0.9)); }catch(e){}
+          bg[m]=im; draw(); setMsg('背景画像を設定しました。');
+        };
+        im.src=fr.result;
       };
-      im.src=fr.result;
-    };
-    fr.readAsDataURL(f);
+      fr.readAsDataURL(f);
+    });
+  }
+  bindBg('bgS','s'); bindBg('bgX','x');
+  THEMES.forEach(function(t){
+    var b=document.createElement('button'); b.className='th'; b.setAttribute('data-id',t.id);
+    b.innerHTML='<i style="background:'+t.base+';border-color:'+t.acc+'"></i>'+t.name;
+    b.onclick=function(){ applyTheme(t.id); persist(); draw(); };
+    $('themes').appendChild(b);
   });
+  applyTheme(theme);
 
   refreshCount(); refreshAddon(); setMode('s');
 })();
