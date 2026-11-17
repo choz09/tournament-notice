@@ -55,6 +55,9 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .tab.on{color:var(--fg);border-color:var(--gold)}
 .tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .note{font-size:12px;color:var(--muted)}
+label b{margin-left:8px;font-size:12px;padding:2px 8px;border-radius:99px;background:#10131b;border:1px solid var(--line)}
+label b.ok{color:#9fd8a8;border-color:#3f6a47}
+label b.no{color:#e0a45e;border-color:#6a5230}
 .themes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .th{font:inherit;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:#10131b;color:var(--fg);cursor:pointer}
 .th.on{border-color:var(--gold)}
@@ -115,14 +118,14 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <div class="themes" id="themes"></div>
     </div>
     <div class="file">
-      <label for="bgS" id="lblS">ストーリー用の背景画像（9:16）</label>
+      <label for="bgS" id="lblS">ストーリー用の背景画像（9:16）<b id="stS"></b></label>
       <input id="bgS" type="file" accept="image/*">
     </div>
     <div class="file">
-      <label for="bgX" id="lblX">X用の背景画像（4:5）。未選択ならストーリー用の中央を切り出します</label>
+      <label for="bgX" id="lblX">X用の背景画像（4:5）<b id="stX"></b><br>未選択ならストーリー用の中央を切り出します</label>
       <input id="bgX" type="file" accept="image/*">
     </div>
-    <div class="note">背景画像は色ごとに1組ずつ、端末に記憶されます。画像がない色は、単色の背景で表示します。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
+    <div class="note">背景画像は色ごとに1組ずつ、端末に記憶されます（版: 11/17-c）。画像がない色は、単色の背景で表示します。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
   </div>
 
   <div class="btns">
@@ -177,18 +180,30 @@ input[type=range]{width:100%;accent-color:var(--gold)}
   ];
   var GOLD, IVORY, TH=THEMES[0];
   function acca(a){ var n=parseInt(TH.acc.slice(1),16); return 'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+  function refreshStatus(){
+    [['s','stS'],['x','stX']].forEach(function(a){
+      var e=$(a[1]); if(!e) return; var ok=!!bg[a[0]];
+      e.textContent= ok ? '✓ 設定済み' : '未設定'; e.className= ok ? 'ok' : 'no';
+    });
+  }
+  function legacyGet(k){
+    try{ var u=localStorage.getItem(k); if(!u) return null; var p=u.split(','), bin=atob(p[1]), a=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return new Blob([a],{type:'image/jpeg'}); }catch(e){ return null; }
+  }
   function applyTheme(id){
     TH=THEMES[0]; THEMES.forEach(function(t){ if(t.id===id) TH=t; });
     theme=TH.id; GOLD=TH.acc; IVORY=TH.ivory;
     bg={s:null,x:null}; var myTheme=theme;
     ['s','x'].forEach(function(m){
-      idbGet('tj_bg_'+myTheme+'_'+m).then(function(blob){
+      var key='tj_bg_'+myTheme+'_'+m;
+      idbGet(key).then(function(blob){
+        if(!blob) blob=legacyGet(key);
         if(!blob||myTheme!==theme) return;
         var u=URL.createObjectURL(blob), im=new Image();
-        im.onload=function(){ if(myTheme===theme){ bg[m]=im; draw(); } };
+        im.onload=function(){ if(myTheme===theme){ bg[m]=im; draw(); refreshStatus(); } };
         im.src=u;
       });
     });
+    refreshStatus();
     var box=$('themes'); if(box){ Array.prototype.forEach.call(box.children,function(b){ b.classList.toggle('on',b.getAttribute('data-id')===theme); }); }
   }
   var FIELDS=['name','start','regend','entry','addonFee'];
@@ -414,7 +429,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
           c.width=Math.round(im.width*r); c.height=Math.round(im.height*r);
           c.getContext('2d').drawImage(im,0,0,c.width,c.height);
           var key='tj_bg_'+theme+'_'+m;
-          bg[m]=im; draw();
+          bg[m]=im; draw(); refreshStatus();
           c.toBlob(function(blob){
             if(!blob){ setMsg('背景画像を設定しました（端末への記憶はできませんでした）。'); return; }
             idbPut(key,blob).then(function(){ setMsg('背景画像を設定して、端末に記憶しました。'); },function(){ setMsg('背景画像を設定しました。ただし端末に記憶できなかったため、次回は選び直しが必要です。'); });
