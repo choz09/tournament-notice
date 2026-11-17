@@ -145,6 +145,30 @@ input[type=range]{width:100%;accent-color:var(--gold)}
   var mode='s', count=3, theme='teal', bg={s:null,x:null}, ypos={s:960,x:675}, DEF={s:960,x:675};
   var RANGE={s:[400,1500],x:[300,1050]}, H={s:1920,x:1350};
   var FONT='"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif';
+  /* 背景画像は容量の大きいIndexedDBに保存する(localStorageは約5MBで、8枚は入らない) */
+  var dbp=null;
+  function openDb(){
+    if(dbp) return dbp;
+    dbp=new Promise(function(res,rej){
+      try{
+        var r=indexedDB.open('tj_db',1);
+        r.onupgradeneeded=function(){ r.result.createObjectStore('bg'); };
+        r.onsuccess=function(){ res(r.result); };
+        r.onerror=function(){ rej(r.error); };
+      }catch(e){ rej(e); }
+    });
+    return dbp;
+  }
+  function idbGet(k){
+    return openDb().then(function(db){ return new Promise(function(res){
+      try{ var q=db.transaction('bg','readonly').objectStore('bg').get(k); q.onsuccess=function(){ res(q.result||null); }; q.onerror=function(){ res(null); }; }catch(e){ res(null); }
+    }); }).catch(function(){ return null; });
+  }
+  function idbPut(k,blob){
+    return openDb().then(function(db){ return new Promise(function(res,rej){
+      try{ var t=db.transaction('bg','readwrite'); t.objectStore('bg').put(blob,k); t.oncomplete=function(){ res(); }; t.onerror=function(){ rej(t.error); }; t.onabort=function(){ rej(t.error); }; }catch(e){ rej(e); }
+    }); });
+  }
   var THEMES=[
     {id:'teal',name:'深緑ティール',acc:'#d9bd82',ivory:'#f3ecdc',base:'#1f4a4c',edge:'#153538'},
     {id:'wine',name:'ワイン',acc:'#e3bea0',ivory:'#f6ece2',base:'#4a1f2a',edge:'#341319'},
@@ -156,8 +180,15 @@ input[type=range]{width:100%;accent-color:var(--gold)}
   function applyTheme(id){
     TH=THEMES[0]; THEMES.forEach(function(t){ if(t.id===id) TH=t; });
     theme=TH.id; GOLD=TH.acc; IVORY=TH.ivory;
-    bg={s:null,x:null};
-    ['s','x'].forEach(function(m){ try{ var u=localStorage.getItem('tj_bg_'+theme+'_'+m); if(u){ var im=new Image(); im.onload=function(){ bg[m]=im; draw(); }; im.src=u; } }catch(e){} });
+    bg={s:null,x:null}; var myTheme=theme;
+    ['s','x'].forEach(function(m){
+      idbGet('tj_bg_'+myTheme+'_'+m).then(function(blob){
+        if(!blob||myTheme!==theme) return;
+        var u=URL.createObjectURL(blob), im=new Image();
+        im.onload=function(){ if(myTheme===theme){ bg[m]=im; draw(); } };
+        im.src=u;
+      });
+    });
     var box=$('themes'); if(box){ Array.prototype.forEach.call(box.children,function(b){ b.classList.toggle('on',b.getAttribute('data-id')===theme); }); }
   }
   var FIELDS=['name','start','regend','entry','addonFee'];
@@ -382,8 +413,12 @@ input[type=range]{width:100%;accent-color:var(--gold)}
           var c=document.createElement('canvas'); var r=Math.min(1,1080/im.width);
           c.width=Math.round(im.width*r); c.height=Math.round(im.height*r);
           c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-          try{ localStorage.setItem('tj_bg_'+theme+'_'+m,c.toDataURL('image/jpeg',0.9)); }catch(e){}
-          bg[m]=im; draw(); setMsg('背景画像を設定しました。');
+          var key='tj_bg_'+theme+'_'+m;
+          bg[m]=im; draw();
+          c.toBlob(function(blob){
+            if(!blob){ setMsg('背景画像を設定しました（端末への記憶はできませんでした）。'); return; }
+            idbPut(key,blob).then(function(){ setMsg('背景画像を設定して、端末に記憶しました。'); },function(){ setMsg('背景画像を設定しました。ただし端末に記憶できなかったため、次回は選び直しが必要です。'); });
+          },'image/jpeg',0.92);
         };
         im.src=fr.result;
       };
