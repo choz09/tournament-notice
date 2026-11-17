@@ -180,7 +180,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       document.fonts.load('500 40px "Zen Kaku Gothic New"',s),
       document.fonts.load('700 40px "Zen Kaku Gothic New"',s),
       document.fonts.load('900 40px "Zen Kaku Gothic New"',s),
-      document.fonts.load('700 40px "Cinzel"',"START ENTRY REG-END ADD-ON Today's | TOURNAMENT")
+      document.fonts.load('700 40px "Cinzel"',"START ENTRY REG-END ADD-ON Today's TOURNAMENT")
     ]).catch(function(){});
   }
 
@@ -264,7 +264,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     var R=rows(), RH=118;
     var total=250+R.length*RH+60+(count>0?300:190);
     var top=ypos[m]-total/2;
-    spaced(c,"Today's | TOURNAMENT",top+20,50,GOLD,10);
+    spaced(c,"Today's TOURNAMENT",top+20,50,GOLD,10);
     c.fillStyle='rgba(217,189,130,.55)'; c.fillRect(440,top+54,200,2);
     var name=($('name').value||'').trim()||'TOURNAMENT';
     var fs=fitName(c,name,900);
