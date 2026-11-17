@@ -125,7 +125,7 @@ label b.no{color:#e0a45e;border-color:#6a5230}
       <label for="bgX" id="lblX">X用の背景画像（4:5）<b id="stX"></b><br>未選択ならストーリー用の中央を切り出します</label>
       <input id="bgX" type="file" accept="image/*">
     </div>
-    <div class="note">背景画像は色ごとに1組ずつ、端末に記憶されます（版: 11/17-c）。画像がない色は、単色の背景で表示します。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
+    <div class="note">背景画像は色ごとに最初から入っています。別の画像を使いたいときだけ、下の欄から入れてください（端末に記憶されます）。（版: 11/17-d）画像がない色は、単色の背景で表示します。保存ボタンを押すと共有画面が開くので、「画像を保存」を選ぶと写真に入ります。</div>
   </div>
 
   <div class="btns">
@@ -197,10 +197,11 @@ label b.no{color:#e0a45e;border-color:#6a5230}
       var key='tj_bg_'+myTheme+'_'+m;
       idbGet(key).then(function(blob){
         if(!blob) blob=legacyGet(key);
-        if(!blob||myTheme!==theme) return;
-        var u=URL.createObjectURL(blob), im=new Image();
+        if(myTheme!==theme) return;
+        var im=new Image();
         im.onload=function(){ if(myTheme===theme){ bg[m]=im; draw(); refreshStatus(); } };
-        im.src=u;
+        // 自分で入れた画像があればそれを、なければ最初から入っている背景(bg/色名-s.jpg など)を使う
+        im.src= blob ? URL.createObjectURL(blob) : 'bg/'+myTheme+'-'+m+'.jpg';
       });
     });
     refreshStatus();
